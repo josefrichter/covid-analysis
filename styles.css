@@ -1,0 +1,12 @@
+/* Light touch-ups over the cosmo theme */
+.quarto-title-block .description {
+  font-size: 1.15rem;
+  color: #5a6570;
+}
+h2 {
+  margin-top: 2.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eaecef;
+}
+.callout { border-radius: 8px; }
+figure figcaption { color: #6a737d; font-size: 0.9rem; }

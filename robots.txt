@@ -1,0 +1,1 @@
+Sitemap: https://josefrichter.github.io/covid-analysis/sitemap.xml

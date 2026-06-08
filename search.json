@@ -1,0 +1,65 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "",
+    "text": "During the pandemic, raw case counts dominated the headlines — but a raw count of “new cases today” tells you almost nothing on its own. A country with 10 million people and one with 80 million will report wildly different absolute numbers even when the outbreak is, proportionally, identical.\nThis analysis answers a fairer question:\n\nOn a given day, which countries had the most new COVID-19 cases relative to their population — and where did Czechia sit in that ranking?\n\nTo get there we need three things: a reliable daily case series, population data to normalize by, and a smoothing method to cut through reporting noise (weekends, batch-uploaded backlogs, etc.).\n\n\n\n\n\n\nNote\n\n\n\nThe interactive version of this analysis — with sliders for the averaging window, date, and country selection — is available as a live dashboard. This page shows the full method and reasoning behind it."
+  },
+  {
+    "objectID": "index.html#the-question",
+    "href": "index.html#the-question",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "",
+    "text": "During the pandemic, raw case counts dominated the headlines — but a raw count of “new cases today” tells you almost nothing on its own. A country with 10 million people and one with 80 million will report wildly different absolute numbers even when the outbreak is, proportionally, identical.\nThis analysis answers a fairer question:\n\nOn a given day, which countries had the most new COVID-19 cases relative to their population — and where did Czechia sit in that ranking?\n\nTo get there we need three things: a reliable daily case series, population data to normalize by, and a smoothing method to cut through reporting noise (weekends, batch-uploaded backlogs, etc.).\n\n\n\n\n\n\nNote\n\n\n\nThe interactive version of this analysis — with sliders for the averaging window, date, and country selection — is available as a live dashboard. This page shows the full method and reasoning behind it."
+  },
+  {
+    "objectID": "index.html#the-data",
+    "href": "index.html#the-data",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "The data",
+    "text": "The data\nTwo sources:\n\nConfirmed cases — the Johns Hopkins CSSE global time series, the de-facto standard during the pandemic. One row per region, one column per day, cumulative counts. Pulled live over HTTPS.\nPopulation — UN population estimates (PopTotal, in thousands), used to convert absolute case counts into per-100k rates.\n\n\n\nShow code\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nimport matplotlib.ticker as mticker\n\nplt.rcParams.update({\n    \"figure.figsize\": (11, 5.5), \"figure.dpi\": 110,\n    \"axes.spines.top\": False, \"axes.spines.right\": False,\n    \"axes.grid\": True, \"grid.alpha\": 0.25, \"font.size\": 11,\n})\n\nJHU = (\"https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/\"\n       \"csse_covid_19_data/csse_covid_19_time_series/\"\n       \"time_series_covid19_confirmed_global.csv\")\n\nconfirmed = pd.read_csv(JHU, index_col=\"Country/Region\")\nconfirmed.iloc[:5, :6]\n\n\n\n\n\n\n\n\n\nProvince/State\nLat\nLong\n1/22/20\n1/23/20\n1/24/20\n\n\nCountry/Region\n\n\n\n\n\n\n\n\n\n\nAfghanistan\nNaN\n33.93911\n67.709953\n0\n0\n0\n\n\nAlbania\nNaN\n41.15330\n20.168300\n0\n0\n0\n\n\nAlgeria\nNaN\n28.03390\n1.659600\n0\n0\n0\n\n\nAndorra\nNaN\n42.50630\n1.521800\n0\n0\n0\n\n\nAngola\nNaN\n-11.20270\n17.873900\n0\n0\n0\n\n\n\n\n\n\n\nSeveral large countries (the US, China, Australia…) are split into provinces or states across multiple rows. To compare countries, we collapse those into one row each by summing, and drop the geographic helper columns.\n\n\nShow code\ncases = (confirmed\n         .drop(columns=[\"Province/State\", \"Lat\", \"Long\"])\n         .groupby(\"Country/Region\").sum())\ncases.columns = pd.to_datetime(cases.columns)   # turn date strings into real dates\nprint(f\"{cases.shape[0]} countries × {cases.shape[1]} days \"\n      f\"({cases.columns.min():%b %Y} → {cases.columns.max():%b %Y})\")\n\n\n201 countries × 1143 days (Jan 2020 → Mar 2023)\n\n\n/var/folders/2t/dl_07pys1yxfcc21qngstwww0000gn/T/ipykernel_77630/2969293760.py:4: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.\n  cases.columns = pd.to_datetime(cases.columns)   # turn date strings into real dates"
+  },
+  {
+    "objectID": "index.html#joining-population",
+    "href": "index.html#joining-population",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "Joining population",
+    "text": "Joining population\nThe UN file is keyed by country name with population in thousands, so we multiply by 1,000 to get absolute people. We attach it as a new column and drop micro-states (population &lt; 1,000) whose tiny denominators produce unstable rates.\n\n\nShow code\npopulation = (pd.read_csv(\"populations.csv\")\n             .groupby(\"Location\")[\"PopTotal\"].sum() * 1_000)\n\ncases.insert(0, \"Population\", population)\ncases = cases[cases[\"Population\"] &gt; 1000]\ncases[[\"Population\"]].loc[[\"Czechia\", \"Germany\", \"Sweden\"]]\n\n\n\n\n\n\n\n\n\nPopulation\n\n\nCountry/Region\n\n\n\n\n\nCzechia\n10709000.0\n\n\nGermany\n83784000.0\n\n\nSweden\n10099000.0"
+  },
+  {
+    "objectID": "index.html#the-core-metric-average-daily-increment-per-100k",
+    "href": "index.html#the-core-metric-average-daily-increment-per-100k",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "The core metric: average daily increment per 100k",
+    "text": "The core metric: average daily increment per 100k\nJHU counts are cumulative, so the new cases over the last N days is simply (cumulative today − cumulative N days ago). Dividing by N gives a smoothed average daily increment — this is what flattens out weekend dips and reporting spikes. We then normalize per 100,000 inhabitants so countries of any size sit on the same scale.\n\n\nShow code\nN = 7  # one week — long enough to smooth reporting noise, short enough to stay current\n\nlatest, prior = cases.columns[-1], cases.columns[-1 - N]\n\ncases[\"NdayIncrement\"] = cases[latest] - cases[prior]\ncases[\"DailyAvg\"]      = cases[\"NdayIncrement\"] / N\ncases[\"DailyAvgPer100k\"] = cases[\"DailyAvg\"] / cases[\"Population\"] * 100_000\n\nranking = cases.sort_values(\"DailyAvgPer100k\", ascending=False)\nranking[[\"Population\", \"DailyAvg\", \"DailyAvgPer100k\"]].head(10).round(1)\n\n\n\n\n\n\n\n\n\nPopulation\nDailyAvg\nDailyAvgPer100k\n\n\nCountry/Region\n\n\n\n\n\n\n\nAustria\n9006000.0\n4999.3\n55.5\n\n\nNew Zealand\n4822000.0\n1636.0\n33.9\n\n\nBrunei\n437000.0\n137.6\n31.5\n\n\nBahrain\n1702000.0\n376.0\n22.1\n\n\nKorea, South\n51269000.0\n10220.1\n19.9\n\n\nCyprus\n1207000.0\n227.4\n18.8\n\n\nSlovenia\n2079000.0\n375.4\n18.1\n\n\nLuxembourg\n626000.0\n109.4\n17.5\n\n\nCosta Rica\n5094000.0\n794.4\n15.6\n\n\nChile\n19116000.0\n2885.1\n15.1\n\n\n\n\n\n\n\n\n\n\n\n\n\nTipA normalization gotcha\n\n\n\nBecause PopTotal arrives in thousands, it’s easy to apply the wrong factor and inflate every rate by 100×. The ranking still looks “right” (order is preserved), which is exactly why this kind of bug survives a casual glance — the absolute numbers are what give it away. Here population is converted to absolute people once, up front, so * 100_000 is unambiguous."
+  },
+  {
+    "objectID": "index.html#where-does-czechia-stand",
+    "href": "index.html#where-does-czechia-stand",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "Where does Czechia stand?",
+    "text": "Where does Czechia stand?\n\n\nShow code\ntop = ranking.head(25)\ncolors = [\"#e4572e\" if c == \"Czechia\" else \"#4a6fa5\" for c in top.index]\n\nfig, ax = plt.subplots()\nax.bar(top.index, top[\"DailyAvgPer100k\"], color=colors)\nax.set_ylabel(\"Daily new cases / 100k\")\nax.set_xticks(range(len(top)))\nax.set_xticklabels(top.index, rotation=60, ha=\"right\")\nplt.tight_layout()\nplt.show()\n\ncz_rank = ranking.index.get_loc(\"Czechia\") + 1\nprint(f\"Czechia: rank #{cz_rank} of {len(ranking)} \"\n      f\"· {ranking.loc['Czechia', 'DailyAvgPer100k']:.1f} daily cases / 100k \"\n      f\"· {ranking.loc['Czechia', 'DailyAvg']:,.0f} new cases/day\")\n\n\n\n\n\n\n\n\nFigure 1: Average daily new cases per 100k inhabitants, top 25 countries. Czechia highlighted.\n\n\n\n\n\nCzechia: rank #19 of 184 · 8.4 daily cases / 100k · 896 new cases/day\n\n\nAt this snapshot Czechia sits in the upper-middle of the global distribution — well below the acute outbreaks in Austria and New Zealand, but above most large European neighbours. The per-capita lens completely reorders the picture you’d get from absolute counts, where large countries always dominate."
+  },
+  {
+    "objectID": "index.html#how-did-the-outbreak-evolve",
+    "href": "index.html#how-did-the-outbreak-evolve",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "How did the outbreak evolve?",
+    "text": "How did the outbreak evolve?\nA single snapshot hides the dynamics. Here is the same per-100k metric plotted as a trend over time for a handful of comparable countries — revealing the timing and height of each wave rather than a single number.\n\n\nShow code\npicks = [\"Czechia\", \"Sweden\", \"Germany\", \"Italy\"]\n\ndaily_new = cases.loc[picks, cases.columns[1:-3]].diff(axis=1)  # de-cumulate\nper100k   = daily_new.div(population.loc[picks], axis=0) * 100_000\ntrend     = per100k.T.rolling(N).mean().tail(120)\n\nfig, ax = plt.subplots()\nfor country in picks:\n    ax.plot(trend.index, trend[country], label=country, linewidth=2)\nax.set_ylabel(\"Daily new cases / 100k (7-day avg)\")\nax.legend(frameon=False)\nfig.autofmt_xdate()\nplt.tight_layout()\nplt.show()\n\n\n\n\n\n\n\n\nFigure 2: Daily new cases per 100k (7-day rolling average), last 120 days.\n\n\n\n\n\nThe trajectories tell the story the ranking can’t: Italy’s tall, sustained wave through late 2022; Germany’s slower decline; Czechia’s brief sharp spike followed by a return to one of the lower per-capita rates in the group."
+  },
+  {
+    "objectID": "index.html#takeaways",
+    "href": "index.html#takeaways",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "Takeaways",
+    "text": "Takeaways\n\nNormalize before you compare. Per-100k rates and absolute counts produce almost opposite country rankings; only the former is meaningful across borders.\nSmooth, don’t snapshot. A 7-day average increment removes the weekday reporting artefacts that make raw daily figures so noisy.\nSnapshot and trend. A ranking answers “who’s worst right now”; the time series answers “and is it getting better or worse” — you need both."
+  },
+  {
+    "objectID": "index.html#reproducibility",
+    "href": "index.html#reproducibility",
+    "title": "COVID-19 in Czechia, in Context",
+    "section": "Reproducibility",
+    "text": "Reproducibility\nEverything above runs from two inputs (the live JHU CSV and a bundled population file) with no database or API keys. Toggle “Show code” on any section to see the exact transformation. The same pipeline powers the interactive dashboard.\n\n\n\n\n\n\nWarning\n\n\n\nThe Johns Hopkins feed stopped updating on 10 March 2023, so the figures above reflect the final available data. This is a showcase of the analysis and engineering, not a live tracker."
+  }
+]
