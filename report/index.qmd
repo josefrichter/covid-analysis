@@ -1,0 +1,197 @@
+---
+title: "COVID-19 in Czechia, in Context"
+subtitle: "Comparing countries fairly using per-capita daily case increments"
+description: "A walk-through of the full data pipeline — from raw Johns Hopkins case counts to a ranked, population-normalized comparison of countries."
+author: "Josef Richter"
+date: "2023-03-09"
+date-format: "MMMM YYYY"
+---
+
+## The question
+
+During the pandemic, raw case counts dominated the headlines — but a raw count of
+"new cases today" tells you almost nothing on its own. A country with 10 million
+people and one with 80 million will report wildly different absolute numbers even
+when the outbreak is, proportionally, identical.
+
+This analysis answers a fairer question:
+
+> **On a given day, which countries had the most new COVID-19 cases _relative to
+> their population_ — and where did Czechia sit in that ranking?**
+
+To get there we need three things: a reliable daily case series, population data to
+normalize by, and a smoothing method to cut through reporting noise (weekends,
+batch-uploaded backlogs, etc.).
+
+::: {.callout-note}
+The interactive version of this analysis — with sliders for the averaging window,
+date, and country selection — is available as a
+[**live dashboard**](https://YOUR-APP.streamlit.app). This page shows the full
+method and reasoning behind it.
+:::
+
+## The data
+
+Two sources:
+
+- **Confirmed cases** — the [Johns Hopkins CSSE](https://github.com/CSSEGISandData/COVID-19)
+  global time series, the de-facto standard during the pandemic. One row per
+  region, one column per day, cumulative counts. Pulled live over HTTPS.
+- **Population** — UN population estimates (`PopTotal`, in thousands), used to
+  convert absolute case counts into per-100k rates.
+
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+
+plt.rcParams.update({
+    "figure.figsize": (11, 5.5), "figure.dpi": 110,
+    "axes.spines.top": False, "axes.spines.right": False,
+    "axes.grid": True, "grid.alpha": 0.25, "font.size": 11,
+})
+
+JHU = ("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
+       "csse_covid_19_data/csse_covid_19_time_series/"
+       "time_series_covid19_confirmed_global.csv")
+
+confirmed = pd.read_csv(JHU, index_col="Country/Region")
+confirmed.iloc[:5, :6]
+```
+
+Several large countries (the US, China, Australia…) are split into provinces or
+states across multiple rows. To compare *countries*, we collapse those into one row
+each by summing, and drop the geographic helper columns.
+
+```{python}
+cases = (confirmed
+         .drop(columns=["Province/State", "Lat", "Long"])
+         .groupby("Country/Region").sum())
+cases.columns = pd.to_datetime(cases.columns)   # turn date strings into real dates
+print(f"{cases.shape[0]} countries × {cases.shape[1]} days "
+      f"({cases.columns.min():%b %Y} → {cases.columns.max():%b %Y})")
+```
+
+## Joining population
+
+The UN file is keyed by country name with population in **thousands**, so we
+multiply by 1,000 to get absolute people. We attach it as a new column and drop
+micro-states (population < 1,000) whose tiny denominators produce unstable rates.
+
+```{python}
+population = (pd.read_csv("populations.csv")
+             .groupby("Location")["PopTotal"].sum() * 1_000)
+
+cases.insert(0, "Population", population)
+cases = cases[cases["Population"] > 1000]
+cases[["Population"]].loc[["Czechia", "Germany", "Sweden"]]
+```
+
+## The core metric: average daily increment per 100k
+
+JHU counts are **cumulative**, so the new cases over the last `N` days is simply
+*(cumulative today − cumulative N days ago)*. Dividing by `N` gives a smoothed
+**average daily increment** — this is what flattens out weekend dips and reporting
+spikes. We then normalize per 100,000 inhabitants so countries of any size sit on
+the same scale.
+
+```{python}
+N = 7  # one week — long enough to smooth reporting noise, short enough to stay current
+
+latest, prior = cases.columns[-1], cases.columns[-1 - N]
+
+cases["NdayIncrement"] = cases[latest] - cases[prior]
+cases["DailyAvg"]      = cases["NdayIncrement"] / N
+cases["DailyAvgPer100k"] = cases["DailyAvg"] / cases["Population"] * 100_000
+
+ranking = cases.sort_values("DailyAvgPer100k", ascending=False)
+ranking[["Population", "DailyAvg", "DailyAvgPer100k"]].head(10).round(1)
+```
+
+::: {.callout-tip}
+## A normalization gotcha
+Because `PopTotal` arrives in *thousands*, it's easy to apply the wrong factor and
+inflate every rate by 100×. The ranking still looks "right" (order is preserved),
+which is exactly why this kind of bug survives a casual glance — the absolute
+numbers are what give it away. Here population is converted to absolute people
+*once*, up front, so `* 100_000` is unambiguous.
+:::
+
+## Where does Czechia stand?
+
+```{python}
+#| label: fig-ranking
+#| fig-cap: "Average daily new cases per 100k inhabitants, top 25 countries. Czechia highlighted."
+top = ranking.head(25)
+colors = ["#e4572e" if c == "Czechia" else "#4a6fa5" for c in top.index]
+
+fig, ax = plt.subplots()
+ax.bar(top.index, top["DailyAvgPer100k"], color=colors)
+ax.set_ylabel("Daily new cases / 100k")
+ax.set_xticks(range(len(top)))
+ax.set_xticklabels(top.index, rotation=60, ha="right")
+plt.tight_layout()
+plt.show()
+
+cz_rank = ranking.index.get_loc("Czechia") + 1
+print(f"Czechia: rank #{cz_rank} of {len(ranking)} "
+      f"· {ranking.loc['Czechia', 'DailyAvgPer100k']:.1f} daily cases / 100k "
+      f"· {ranking.loc['Czechia', 'DailyAvg']:,.0f} new cases/day")
+```
+
+At this snapshot Czechia sits in the **upper-middle of the global distribution** —
+well below the acute outbreaks in Austria and New Zealand, but above most large
+European neighbours. The per-capita lens completely reorders the picture you'd get
+from absolute counts, where large countries always dominate.
+
+## How did the outbreak evolve?
+
+A single snapshot hides the dynamics. Here is the same per-100k metric plotted as a
+**trend over time** for a handful of comparable countries — revealing the timing and
+height of each wave rather than a single number.
+
+```{python}
+#| label: fig-trend
+#| fig-cap: "Daily new cases per 100k (7-day rolling average), last 120 days."
+picks = ["Czechia", "Sweden", "Germany", "Italy"]
+
+daily_new = cases.loc[picks, cases.columns[1:-3]].diff(axis=1)  # de-cumulate
+per100k   = daily_new.div(population.loc[picks], axis=0) * 100_000
+trend     = per100k.T.rolling(N).mean().tail(120)
+
+fig, ax = plt.subplots()
+for country in picks:
+    ax.plot(trend.index, trend[country], label=country, linewidth=2)
+ax.set_ylabel("Daily new cases / 100k (7-day avg)")
+ax.legend(frameon=False)
+fig.autofmt_xdate()
+plt.tight_layout()
+plt.show()
+```
+
+The trajectories tell the story the ranking can't: Italy's tall, sustained wave
+through late 2022; Germany's slower decline; Czechia's brief sharp spike followed by
+a return to one of the lower per-capita rates in the group.
+
+## Takeaways
+
+- **Normalize before you compare.** Per-100k rates and absolute counts produce
+  almost opposite country rankings; only the former is meaningful across borders.
+- **Smooth, don't snapshot.** A 7-day average increment removes the weekday
+  reporting artefacts that make raw daily figures so noisy.
+- **Snapshot _and_ trend.** A ranking answers "who's worst right now"; the time
+  series answers "and is it getting better or worse" — you need both.
+
+## Reproducibility
+
+Everything above runs from two inputs (the live JHU CSV and a bundled population
+file) with no database or API keys. Toggle **"Show code"** on any section to see the
+exact transformation. The same pipeline powers the
+[interactive dashboard](https://YOUR-APP.streamlit.app).
+
+::: {.callout-warning}
+The Johns Hopkins feed stopped updating on **10 March 2023**, so the figures above
+reflect the final available data. This is a showcase of the analysis and
+engineering, not a live tracker.
+:::

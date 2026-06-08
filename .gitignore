@@ -1,0 +1,14 @@
+# Large third-party clones — not my work, not needed (analysis fetches JHU live)
+third-party-repos/
+reference-notebooks/
+
+# Large local datasets used only by secondary notebooks (fetch/regenerate as needed)
+data/obec.csv
+data/modely_*.csv
+
+# Build artifacts & cruft
+report/_site/
+report/.quarto/
+**/.ipynb_checkpoints/
+**/__pycache__/
+.DS_Store

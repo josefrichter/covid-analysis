@@ -1,0 +1,25 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "COVID-19 Data Analysis"
+  description: "Cross-country COVID-19 case analysis — Czechia in context"
+  navbar:
+    right:
+      - text: "Live dashboard"
+        href: https://YOUR-APP.streamlit.app
+      - icon: github
+        href: https://github.com/YOUR-USERNAME/covid-analysis
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: right
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    fig-align: center
+    page-layout: article
+    css: styles.css
