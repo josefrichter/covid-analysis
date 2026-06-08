@@ -8,7 +8,7 @@ website:
   navbar:
     right:
       - text: "Live dashboard"
-        href: https://YOUR-APP.streamlit.app
+        href: https://covid-czechia.streamlit.app
       - icon: github
         href: https://github.com/josefrichter/covid-analysis
 

@@ -26,7 +26,7 @@ batch-uploaded backlogs, etc.).
 ::: {.callout-note}
 The interactive version of this analysis — with sliders for the averaging window,
 date, and country selection — is available as a
-[**live dashboard**](https://YOUR-APP.streamlit.app). This page shows the full
+[**live dashboard**](https://covid-czechia.streamlit.app). This page shows the full
 method and reasoning behind it.
 :::
 
@@ -188,7 +188,7 @@ a return to one of the lower per-capita rates in the group.
 Everything above runs from two inputs (the live JHU CSV and a bundled population
 file) with no database or API keys. Toggle **"Show code"** on any section to see the
 exact transformation. The same pipeline powers the
-[interactive dashboard](https://YOUR-APP.streamlit.app).
+[interactive dashboard](https://covid-czechia.streamlit.app).
 
 ::: {.callout-warning}
 The Johns Hopkins feed stopped updating on **10 March 2023**, so the figures above
