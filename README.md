@@ -3,6 +3,18 @@
 Personal COVID-19 data-analytics and charting work (2020–2023), mostly focused on
 Czechia, using JHU CSSE global data plus Czech Ministry of Health (ÚZIS) datasets.
 
+## 🔗 Live showcase
+
+| | Link |
+|---|---|
+| 📄 **Analysis report** (code + narrative + charts) | https://josefrichter.github.io/covid-analysis/ |
+| 📊 **Interactive dashboard** | https://covid-czechia.streamlit.app |
+
+Both run the same pipeline — ranking countries by average daily new cases per 100k —
+and fetch Johns Hopkins data live, so they need no bundled datasets. The report
+(`report/`, built with Quarto) shows *how* the analysis works; the dashboard
+(`dashboard/`, built with Streamlit) lets you explore it interactively.
+
 ## Folder structure
 
 ### `notebooks/` — my own work
