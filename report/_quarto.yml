@@ -10,7 +10,7 @@ website:
       - text: "Live dashboard"
         href: https://YOUR-APP.streamlit.app
       - icon: github
-        href: https://github.com/YOUR-USERNAME/covid-analysis
+        href: https://github.com/josefrichter/covid-analysis
 
 format:
   html:

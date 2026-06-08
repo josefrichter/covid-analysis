@@ -16,10 +16,13 @@ Deploy free:   push this folder to GitHub -> share.streamlit.io
 """
 
 import datetime as dt
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+HERE = Path(__file__).parent  # so bundled files resolve no matter the working dir
 
 JHU_URL = (
     "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/"
@@ -44,7 +47,7 @@ def load_cases() -> pd.DataFrame:
 
 @st.cache_data
 def load_populations() -> pd.Series:
-    pop = pd.read_csv("populations.csv").groupby("Location")["PopTotal"].sum()
+    pop = pd.read_csv(HERE / "populations.csv").groupby("Location")["PopTotal"].sum()
     return pop * 1000  # source is in thousands -> absolute people
 
 
